@@ -1,0 +1,60 @@
+!
+! Standardized base config — Arista EOS
+! Generated from NetBox / demo intent — DO NOT edit on-box as source of truth
+!
+hostname {{ hostname }}
+!
+ip domain-name {{ domain_name }}
+!
+{% for vlan in vlans %}
+vlan {{ vlan.id }}
+   name {{ vlan.name }}
+!
+{% endfor %}
+!
+spanning-tree mode rapid-pvst
+!
+interface Management1
+   description MGMT
+   ip address {{ mgmt_ip }}/24
+!
+{% if default_gateway %}
+ip route 0.0.0.0/0 {{ default_gateway }}
+!
+{% endif %}
+{% for iface in interfaces %}
+interface {{ iface.name }}
+{% if iface.description %}
+   description {{ iface.description }}
+{% endif %}
+{% if not iface.enabled %}
+   shutdown
+{% else %}
+   no shutdown
+{% endif %}
+{% if iface.mode == 'access' %}
+   switchport mode access
+{% if iface.vlan %}
+   switchport access vlan {{ iface.vlan }}
+{% endif %}
+{% elif iface.mode == 'trunk' %}
+   switchport mode trunk
+{% if iface.allowed_vlans %}
+   switchport trunk allowed vlan {{ iface.allowed_vlans | join(',') }}
+{% endif %}
+{% endif %}
+!
+{% endfor %}
+!
+{% for ntp in ntp_servers %}
+ntp server {{ ntp }}
+{% endfor %}
+!
+snmp-server location {{ snmp_location }}
+!
+banner login
+UNAUTHORIZED ACCESS PROHIBITED — {{ hostname }} ({{ site }}/{{ role }})
+Managed by NetBox + Ansible. Manual drift will be detected.
+EOF
+!
+end

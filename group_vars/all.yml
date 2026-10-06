@@ -1,0 +1,12 @@
+---
+ansible_connection: ansible.netcommon.network_cli
+ansible_user: "{{ lookup('env', 'ANSIBLE_NETWORK_USER') | default('admin', true) }}"
+ansible_password: "{{ lookup('env', 'ANSIBLE_NETWORK_PASSWORD') | default('changeme', true) }}"
+ansible_become: true
+ansible_become_method: enable
+ansible_become_password: "{{ lookup('env', 'ANSIBLE_BECOME_PASSWORD') | default(lookup('env', 'ANSIBLE_NETWORK_PASSWORD') | default('changeme', true), true) }}"
+
+expected_dir: "{{ playbook_dir }}/../configs/expected"
+running_dir: "{{ playbook_dir }}/../configs/running"
+reports_dir: "{{ playbook_dir }}/../reports"
+project_root: "{{ playbook_dir }}/.."

@@ -1,0 +1,124 @@
+stages:
+  - generate
+  - validate
+  - deploy_pilot
+  - deploy_prod
+  - drift
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  SOURCE_MODE: "demo"
+  # Override in CI/CD variables for real NetBox:
+  # SOURCE_MODE: netbox
+  # NETBOX_URL: https://netbox.example.com
+  # NETBOX_TOKEN: masked
+
+cache:
+  key: "${CI_COMMIT_REF_SLUG}"
+  paths:
+    - .cache/pip
+    - .venv/
+
+.python_setup: &python_setup
+  image: python:3.12-bookworm
+  before_script:
+    - python -m venv .venv
+    - source .venv/bin/activate
+    - pip install -U pip
+    - pip install -r requirements.txt
+
+generate:
+  <<: *python_setup
+  stage: generate
+  script:
+    - python scripts/cli.py generate
+  artifacts:
+    paths:
+      - configs/expected/
+    expire_in: 7 days
+
+validate:
+  <<: *python_setup
+  stage: validate
+  needs: ["generate"]
+  script:
+    - python scripts/cli.py validate
+  artifacts:
+    paths:
+      - configs/expected/
+    expire_in: 7 days
+
+# Progressive deploy — manual gates
+deploy_pilot:
+  stage: deploy_pilot
+  image: python:3.12-bookworm
+  needs: ["validate"]
+  when: manual
+  allow_failure: false
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq openssh-client
+    - python -m venv .venv && source .venv/bin/activate
+    - pip install -U pip
+    - pip install -r requirements.txt
+    - pip install ansible
+    - ansible-galaxy collection install -r requirements-ansible.yml
+  script:
+    - ansible-playbook playbooks/deploy.yml -i inventories/demo/hosts.yml --limit site_pilote
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+
+deploy_prod:
+  stage: deploy_prod
+  image: python:3.12-bookworm
+  needs: ["deploy_pilot"]
+  when: manual
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq openssh-client
+    - python -m venv .venv && source .venv/bin/activate
+    - pip install -U pip
+    - pip install -r requirements.txt
+    - pip install ansible
+    - ansible-galaxy collection install -r requirements-ansible.yml
+  script:
+    - ansible-playbook playbooks/deploy.yml -i inventories/demo/hosts.yml --limit site_prod_sim
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Nightly schedule: Settings → CI/CD → Schedules → cron 0 2 * * *
+drift:
+  <<: *python_setup
+  stage: drift
+  needs: ["generate"]
+  script:
+    # In real labs, collect running configs first via ansible-playbook playbooks/drift.yml
+    # Here we run the comparator; seed configs/running/ from the collect job or artifacts.
+    - |
+      if [ -z "$(ls -A configs/running 2>/dev/null | grep -v gitkeep || true)" ]; then
+        echo "No running configs present — seeding from expected for pipeline smoke test"
+        cp configs/expected/*.cfg configs/running/ 2>/dev/null || true
+        # Introduce intentional drift on one host for demo of reporting (non-fatal smoke)
+        if [ -f configs/running/SW-PROD-01.cfg ]; then
+          echo "! DRIFT-SMOKE-LINE" >> configs/running/SW-PROD-01.cfg
+        fi
+      fi
+    - python scripts/cli.py drift || true
+    - |
+      # Re-run strictly if DRIFT_FAIL=1 (set on scheduled pipelines for real alerting)
+      if [ "${DRIFT_FAIL:-0}" = "1" ]; then
+        python scripts/cli.py drift
+      fi
+  artifacts:
+    when: always
+    paths:
+      - reports/
+      - configs/running/
+    expire_in: 14 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+    - if: $CI_COMMIT_BRANCH
+      when: manual
+      allow_failure: true

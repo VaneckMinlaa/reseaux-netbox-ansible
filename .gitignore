@@ -1,0 +1,36 @@
+# Secrets & local env
+.env
+*.vault
+vault_pass.txt
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Ansible
+*.retry
+.ansible/
+
+# Generated configs & reports (keep directories)
+configs/expected/*
+!configs/expected/.gitkeep
+configs/running/*
+!configs/running/.gitkeep
+reports/*
+!reports/.gitkeep
+!reports/sample_*
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+Desktop.ini
+.DS_Store

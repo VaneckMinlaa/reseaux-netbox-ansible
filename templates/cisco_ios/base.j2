@@ -1,0 +1,73 @@
+!
+! Standardized base config — Cisco IOS
+! Generated from NetBox / demo intent — DO NOT edit on-box as source of truth
+!
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+no service pad
+!
+hostname {{ hostname }}
+!
+ip domain-name {{ domain_name }}
+!
+no ip http server
+no ip http secure-server
+!
+{% for vlan in vlans %}
+vlan {{ vlan.id }}
+ name {{ vlan.name }}
+!
+{% endfor %}
+!
+spanning-tree mode rapid-pvst
+spanning-tree extend system-id
+spanning-tree vlan 1-4094 priority {{ stp_priority }}
+!
+interface Vlan1
+ description MGMT
+ ip address {{ mgmt_ip }} {{ mgmt_mask }}
+ no shutdown
+!
+{% if default_gateway %}
+ip default-gateway {{ default_gateway }}
+!
+{% endif %}
+{% for iface in interfaces %}
+interface {{ iface.name }}
+{% if iface.description %}
+ description {{ iface.description }}
+{% endif %}
+{% if not iface.enabled %}
+ shutdown
+{% else %}
+ no shutdown
+{% endif %}
+{% if iface.mode == 'access' %}
+ switchport mode access
+{% if iface.vlan %}
+ switchport access vlan {{ iface.vlan }}
+{% endif %}
+ spanning-tree portfast
+{% elif iface.mode == 'trunk' %}
+ switchport mode trunk
+{% if iface.allowed_vlans %}
+ switchport trunk allowed vlan {{ iface.allowed_vlans | join(',') }}
+{% endif %}
+{% endif %}
+!
+{% endfor %}
+!
+{% for ntp in ntp_servers %}
+ntp server {{ ntp }}
+{% endfor %}
+!
+snmp-server location {{ snmp_location }}
+snmp-server contact netops@lab.local
+!
+banner motd ^
+UNAUTHORIZED ACCESS PROHIBITED — {{ hostname }} ({{ site }}/{{ role }})
+Managed by NetBox + Ansible. Manual drift will be detected.
+^
+!
+end

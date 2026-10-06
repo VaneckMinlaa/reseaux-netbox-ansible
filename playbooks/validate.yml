@@ -1,0 +1,29 @@
+---
+# Validate expected configs (policy rules)
+- name: Validate expected network configs
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    site_filter: "{{ site | default('') }}"
+    host_filter: "{{ target_host | default('') }}"
+  tasks:
+    - name: Build CLI arguments
+      ansible.builtin.set_fact:
+        validate_args: >-
+          {{
+            (['--site', site_filter] if site_filter else [])
+            + (['--host', host_filter] if host_filter else [])
+          }}
+
+    - name: Run netops validate
+      ansible.builtin.command:
+        argv: "{{ ['python', playbook_dir + '/../scripts/cli.py', 'validate'] + validate_args }}"
+        chdir: "{{ playbook_dir }}/.."
+      register: validate_result
+      changed_when: false
+      failed_when: validate_result.rc != 0
+
+    - name: Show validation output
+      ansible.builtin.debug:
+        var: validate_result.stdout_lines

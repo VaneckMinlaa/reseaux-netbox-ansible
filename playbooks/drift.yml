@@ -1,0 +1,68 @@
+---
+# Nightly drift: collect running-config and compare to expected
+# Usage:
+#   ansible-playbook playbooks/drift.yml -i inventories/demo/hosts.yml
+
+- name: Collect running configs
+  hosts: switches
+  gather_facts: false
+  vars:
+    running_file: "{{ running_dir }}/{{ inventory_hostname }}.cfg"
+  tasks:
+    - name: Ensure running dir exists
+      ansible.builtin.file:
+        path: "{{ running_dir }}"
+        state: directory
+      delegate_to: localhost
+      run_once: true
+
+    - name: Collect Cisco IOS running-config
+      cisco.ios.ios_command:
+        commands: show running-config
+      register: ios_run
+      when: ansible_network_os is search('ios')
+
+    - name: Collect Arista EOS running-config
+      arista.eos.eos_command:
+        commands: show running-config
+      register: eos_run
+      when: ansible_network_os is search('eos')
+
+    - name: Write running config to disk (Cisco)
+      ansible.builtin.copy:
+        content: "{{ ios_run.stdout[0] }}\n"
+        dest: "{{ running_file }}"
+      delegate_to: localhost
+      when: ios_run is defined and ios_run.stdout is defined
+
+    - name: Write running config to disk (Arista)
+      ansible.builtin.copy:
+        content: "{{ eos_run.stdout[0] }}\n"
+        dest: "{{ running_file }}"
+      delegate_to: localhost
+      when: eos_run is defined and eos_run.stdout is defined
+
+- name: Compare running vs expected (drift)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Run netops drift
+      ansible.builtin.command:
+        argv:
+          - python
+          - "{{ playbook_dir }}/../scripts/cli.py"
+          - drift
+        chdir: "{{ playbook_dir }}/.."
+      register: drift_result
+      changed_when: false
+      failed_when: false
+
+    - name: Show drift output
+      ansible.builtin.debug:
+        var: drift_result.stdout_lines
+
+    - name: Fail pipeline if drift detected
+      ansible.builtin.fail:
+        msg: "Configuration drift detected — see reports/"
+      when: drift_result.rc != 0

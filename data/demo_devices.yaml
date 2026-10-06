@@ -1,0 +1,97 @@
+# Demo Source of Truth (replaces NetBox when SOURCE_MODE=demo)
+# Mimics the normalized schema produced from NetBox.
+
+devices:
+  - hostname: SW-PILOTE-01
+    platform: cisco_ios
+    role: access
+    site: pilote
+    mgmt_ip: 10.10.10.11
+    mgmt_mask: 255.255.255.0
+    default_gateway: 10.10.10.1
+    domain_name: lab.local
+    ntp_servers: ["10.0.0.1", "10.0.0.2"]
+    snmp_location: "PNETLab Site Pilote"
+    stp_priority: 24576
+    ansible_host: 10.10.10.11
+    vlans:
+      - { id: 10, name: USERS }
+      - { id: 20, name: VOICE }
+      - { id: 99, name: MGMT }
+    interfaces:
+      - name: GigabitEthernet0/1
+        mode: access
+        vlan: 10
+        description: "PC-01"
+        enabled: true
+      - name: GigabitEthernet0/2
+        mode: access
+        vlan: 20
+        description: "PHONE-01"
+        enabled: true
+      - name: GigabitEthernet0/24
+        mode: trunk
+        allowed_vlans: [10, 20, 99]
+        description: "UPLINK-TO-CORE"
+        enabled: true
+
+  - hostname: SW-PILOTE-02
+    platform: arista_eos
+    role: access
+    site: pilote
+    mgmt_ip: 10.10.10.12
+    mgmt_mask: 255.255.255.0
+    default_gateway: 10.10.10.1
+    domain_name: lab.local
+    ntp_servers: ["10.0.0.1"]
+    snmp_location: "PNETLab Site Pilote"
+    stp_priority: 28672
+    ansible_host: 10.10.10.12
+    vlans:
+      - { id: 10, name: USERS }
+      - { id: 20, name: VOICE }
+      - { id: 99, name: MGMT }
+    interfaces:
+      - name: Ethernet1
+        mode: access
+        vlan: 10
+        description: "PC-02"
+        enabled: true
+      - name: Ethernet24
+        mode: trunk
+        allowed_vlans: [10, 20, 99]
+        description: "UPLINK-TO-CORE"
+        enabled: true
+
+  - hostname: SW-PROD-01
+    platform: cisco_ios
+    role: access
+    site: prod-sim
+    mgmt_ip: 10.20.20.11
+    mgmt_mask: 255.255.255.0
+    default_gateway: 10.20.20.1
+    domain_name: lab.local
+    ntp_servers: ["10.0.0.1"]
+    snmp_location: "PNETLab Site Prod-Sim"
+    stp_priority: 32768
+    ansible_host: 10.20.20.11
+    vlans:
+      - { id: 10, name: USERS }
+      - { id: 30, name: GUEST }
+      - { id: 99, name: MGMT }
+    interfaces:
+      - name: GigabitEthernet0/1
+        mode: access
+        vlan: 10
+        description: "PC-PROD-01"
+        enabled: true
+      - name: GigabitEthernet0/2
+        mode: access
+        vlan: 30
+        description: "GUEST-01"
+        enabled: true
+      - name: GigabitEthernet0/24
+        mode: trunk
+        allowed_vlans: [10, 30, 99]
+        description: "UPLINK-TO-CORE"
+        enabled: true

@@ -1,0 +1,7 @@
+---
+# Full local/CI flow without touching devices
+- name: Generate
+  ansible.builtin.import_playbook: generate.yml
+
+- name: Validate
+  ansible.builtin.import_playbook: validate.yml

@@ -1,0 +1,36 @@
+---
+# NetBox dynamic inventory plugin
+# Usage:
+#   ansible-inventory -i inventories/netbox.yml --list
+# Requires: ansible-galaxy collection install netbox.netbox
+#           NETBOX_URL + NETBOX_TOKEN in environment or ansible.cfg env
+
+plugin: netbox.netbox.nb_inventory
+api_endpoint: "{{ lookup('env', 'NETBOX_URL') }}"
+token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
+validate_certs: false
+config_context: false
+flatten_custom_fields: true
+
+group_by:
+  - site
+  - platform
+  - device_role
+
+compose:
+  ansible_host: primary_ip4.host
+  platform: platform.slug | replace('-', '_')
+
+query_filters:
+  - status: active
+
+device_query_filters:
+  - has_primary_ip: true
+
+keyed_groups:
+  - key: site.slug
+    prefix: netbox_site
+  - key: platform.slug
+    prefix: netbox_platform
+  - key: device_role.slug
+    prefix: netbox_role

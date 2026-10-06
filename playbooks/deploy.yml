@@ -1,0 +1,59 @@
+---
+# Progressive deployment: push expected configs to devices
+# Usage:
+#   ansible-playbook playbooks/deploy.yml -i inventories/demo/hosts.yml --limit site_pilote
+#   ansible-playbook playbooks/deploy.yml -i inventories/demo/hosts.yml --limit site_prod_sim
+#
+# Safety: serial=1, never run without --limit on first rolls
+
+- name: Deploy standardized configs (progressive)
+  hosts: switches
+  gather_facts: false
+  serial: 1
+  max_fail_percentage: 0
+  any_errors_fatal: true
+  vars:
+    expected_file: "{{ expected_dir }}/{{ inventory_hostname }}.cfg"
+  tasks:
+    - name: Ensure expected config exists
+      ansible.builtin.stat:
+        path: "{{ expected_file }}"
+      register: expected_stat
+      delegate_to: localhost
+
+    - name: Fail if expected config missing
+      ansible.builtin.fail:
+        msg: >-
+          Missing {{ expected_file }}.
+          Run playbooks/generate.yml then playbooks/validate.yml first.
+      when: not expected_stat.stat.exists
+
+    - name: Load expected config content
+      ansible.builtin.slurp:
+        src: "{{ expected_file }}"
+      register: expected_slurp
+      delegate_to: localhost
+
+    - name: Deploy Cisco IOS config from expected file
+      cisco.ios.ios_config:
+        src: "{{ expected_file }}"
+        replace: line
+        save_when: modified
+      when: ansible_network_os is search('ios')
+      notify: Save cisco config
+
+    - name: Deploy Arista EOS config from expected file
+      arista.eos.eos_config:
+        src: "{{ expected_file }}"
+        replace: line
+        save_when: modified
+      when: ansible_network_os is search('eos')
+
+    - name: Show deployment target
+      ansible.builtin.debug:
+        msg: "Deployed {{ inventory_hostname }} ({{ ansible_host }}) from {{ expected_file }}"
+
+  handlers:
+    - name: Save cisco config
+      cisco.ios.ios_command:
+        commands: "write memory"

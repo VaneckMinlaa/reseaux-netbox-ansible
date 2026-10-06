@@ -1,0 +1,36 @@
+---
+# Generate expected configs via Python netops (NetBox or demo YAML)
+- name: Generate expected network configs
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    site_filter: "{{ site | default('') }}"
+    host_filter: "{{ target_host | default('') }}"
+  tasks:
+    - name: Ensure output directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - "{{ playbook_dir }}/../configs/expected"
+        - "{{ playbook_dir }}/../reports"
+
+    - name: Build CLI arguments
+      ansible.builtin.set_fact:
+        generate_args: >-
+          {{
+            (['--site', site_filter] if site_filter else [])
+            + (['--host', host_filter] if host_filter else [])
+          }}
+
+    - name: Run netops generate
+      ansible.builtin.command:
+        argv: "{{ ['python', playbook_dir + '/../scripts/cli.py', 'generate'] + generate_args }}"
+        chdir: "{{ playbook_dir }}/.."
+      register: generate_result
+      changed_when: true
+
+    - name: Show generate output
+      ansible.builtin.debug:
+        var: generate_result.stdout_lines
